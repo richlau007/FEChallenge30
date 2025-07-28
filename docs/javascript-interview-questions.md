@@ -327,60 +327,561 @@ const immutableArr = Object.freeze([1, 2, 3]);
 ## 3. this关键字的工作原理？
 
 ### 📖 定义
-`this`的值取决于函数的调用方式，而不是定义位置。
+`this`的值取决于函数的调用方式，而不是定义位置。JavaScript中的`this`绑定遵循四个主要规则。
 
-### 💡 不同场景下的this
+### 🎯 this绑定的四大规则
 
-#### 3.1 对象方法调用
+#### 3.1 默认绑定 (Default Binding)
+
+**定义**: 当函数独立调用时，`this`指向全局对象（浏览器中是`window`，Node.js中是`global`）。在严格模式下，`this`为`undefined`。
+
 ```javascript
-const person = {
-  name: 'John',
-  sayHello: function() {
-    console.log('Hello, ' + this.name); // this指向person对象
-  }
-};
-person.sayHello(); // Output: Hello, John
-```
-
-#### 3.2 普通函数调用
-```javascript
-function greet() {
-  console.log(this); // 非严格模式：全局对象，严格模式：undefined
+// 非严格模式
+function sayName() {
+  console.log(this.name); // this指向全局对象
 }
-greet();
+
+var name = "全局变量";
+sayName(); // "全局变量"
+
+// 严格模式
+"use strict";
+function sayNameStrict() {
+  console.log(this); // undefined
+  // console.log(this.name); // TypeError: Cannot read property 'name' of undefined
+}
+sayNameStrict();
 ```
 
-#### 3.3 箭头函数
+**常见陷阱**:
 ```javascript
 const obj = {
-  name: 'Jane',
-  sayHello: function() {
-    const innerFunc = () => {
-      console.log(this.name); // 继承外层函数的this
-    };
-    innerFunc();
+  name: "对象属性",
+  sayName: function() {
+    console.log(this.name);
   }
 };
-obj.sayHello(); // Output: Jane
+
+const fn = obj.sayName; // 赋值给变量
+fn(); // undefined (默认绑定，不是对象方法调用)
+
+// 回调函数中的默认绑定
+setTimeout(obj.sayName, 1000); // undefined (函数作为参数传递时失去绑定)
 ```
 
-#### 3.4 显式绑定
+#### 3.2 隐式绑定 (Implicit Binding)
+
+**定义**: 当函数作为对象的方法被调用时，`this`隐式绑定到该对象。
+
 ```javascript
-function greet() {
-  console.log(`Hello, ${this.name}`);
+const person = {
+  name: 'Alice',
+  age: 30,
+  sayHello: function() {
+    console.log(`Hello, I'm ${this.name}, ${this.age} years old`);
+  },
+  getInfo: function() {
+    return {
+      getName: function() {
+        return this.name; // this指向getInfo返回的对象
+      }
+    };
+  }
+};
+
+person.sayHello(); // "Hello, I'm Alice, 30 years old"
+
+// 链式调用 - this指向最后一个调用对象
+const info = person.getInfo();
+console.log(info.getName()); // undefined (this指向info对象，没有name属性)
+```
+
+**隐式绑定丢失**:
+```javascript
+const obj = {
+  name: "对象",
+  sayName: function() {
+    console.log(this.name);
+  }
+};
+
+// 情况1: 赋值导致丢失
+const fn = obj.sayName;
+fn(); // undefined (变成了默认绑定)
+
+// 情况2: 传参导致丢失
+function callFunction(func) {
+  func(); // 默认绑定
+}
+callFunction(obj.sayName); // undefined
+
+// 情况3: 内置函数导致丢失
+setTimeout(obj.sayName, 1000); // undefined
+[1, 2, 3].forEach(obj.sayName); // undefined (每次调用都是默认绑定)
+```
+
+**解决隐式绑定丢失**:
+```javascript
+// 方法1: 包装函数
+setTimeout(() => obj.sayName(), 1000); // 正确输出
+
+// 方法2: 使用bind
+setTimeout(obj.sayName.bind(obj), 1000); // 正确输出
+
+// 方法3: 存储引用
+const boundSayName = obj.sayName.bind(obj);
+setTimeout(boundSayName, 1000); // 正确输出
+```
+
+#### 3.3 显式绑定 (Explicit Binding)
+
+**定义**: 使用`call()`、`apply()`或`bind()`方法显式指定`this`的值。
+
+##### call() 方法
+```javascript
+function introduce(greeting, punctuation) {
+  console.log(greeting + ', I am ' + this.name + punctuation);
 }
 
-const person = { name: 'Alice' };
+const person1 = { name: 'John' };
+const person2 = { name: 'Jane' };
 
-greet.call(person);    // Hello, Alice
-greet.apply(person);   // Hello, Alice
-greet.bind(person)();  // Hello, Alice
+// call(thisArg, arg1, arg2, ...)
+introduce.call(person1, 'Hello', '!'); // "Hello, I am John!"
+introduce.call(person2, 'Hi', '.'); // "Hi, I am Jane."
 ```
 
-### 🎯 面试要点
-- 默认绑定、隐式绑定、显式绑定、new绑定
-- 箭头函数的词法作用域
-- call、apply、bind的区别
+##### apply() 方法
+```javascript
+function introduce(greeting, punctuation) {
+  console.log(greeting + ', I am ' + this.name + punctuation);
+}
+
+const person = { name: 'Bob' };
+
+// apply(thisArg, [argsArray])
+introduce.apply(person, ['Hello', '!']); // "Hello, I am Bob!"
+
+// apply在数组操作中的应用
+const numbers = [5, 6, 2, 3, 7];
+console.log(Math.max.apply(null, numbers)); // 7
+// ES6写法: Math.max(...numbers)
+```
+
+##### bind() 方法
+```javascript
+function greet(greeting) {
+  return greeting + ', ' + this.name;
+}
+
+const person = { name: 'Charlie' };
+
+// bind返回一个新函数，不会立即执行
+const boundGreet = greet.bind(person);
+console.log(boundGreet('Hello')); // "Hello, Charlie"
+
+// bind可以进行参数预设(柯里化)
+const sayHello = greet.bind(person, 'Hello');
+console.log(sayHello()); // "Hello, Charlie"
+```
+
+##### call、apply、bind的详细对比
+
+| 方法 | 执行时机 | 参数传递 | 返回值 | 使用场景 |
+|------|---------|---------|--------|---------|
+| `call` | 立即执行 | 逐个传递 | 函数执行结果 | 参数数量固定且较少 |
+| `apply` | 立即执行 | 数组形式 | 函数执行结果 | 参数数量不确定或来自数组 |
+| `bind` | 返回新函数 | 逐个传递 | 绑定后的新函数 | 需要稍后执行或事件处理 |
+
+```javascript
+function sum(a, b, c) {
+  console.log(`${this.name}: ${a} + ${b} + ${c} = ${a + b + c}`);
+}
+
+const calculator = { name: 'Calculator' };
+
+// call - 立即执行，参数逐个传递
+sum.call(calculator, 1, 2, 3); // "Calculator: 1 + 2 + 3 = 6"
+
+// apply - 立即执行，参数以数组形式传递
+sum.apply(calculator, [4, 5, 6]); // "Calculator: 4 + 5 + 6 = 15"
+
+// bind - 返回新函数，可以分步传递参数
+const boundSum = sum.bind(calculator, 7, 8);
+boundSum(9); // "Calculator: 7 + 8 + 9 = 24"
+
+// 实际应用：数组方法的借用
+const arrayLike = { 0: 'a', 1: 'b', 2: 'c', length: 3 };
+const realArray = Array.prototype.slice.call(arrayLike);
+console.log(realArray); // ['a', 'b', 'c']
+```
+
+**硬绑定**:
+```javascript
+function hardBind(fn, obj) {
+  return function() {
+    return fn.apply(obj, arguments);
+  };
+}
+
+// 或者使用内置的bind
+function sayName() {
+  console.log(this.name);
+}
+
+const obj = { name: 'Hard Bound' };
+const hardBound = sayName.bind(obj);
+
+// 无法被重新绑定
+hardBound.call({ name: 'Other' }); // 仍然输出 "Hard Bound"
+```
+
+#### 3.4 new绑定 (New Binding)
+
+**定义**: 使用`new`操作符调用函数时，会创建一个新对象，`this`指向这个新对象。
+
+```javascript
+function Person(name, age) {
+  this.name = name;
+  this.age = age;
+  this.sayHello = function() {
+    console.log(`Hello, I'm ${this.name}`);
+  };
+}
+
+const person1 = new Person('Alice', 25);
+const person2 = new Person('Bob', 30);
+
+person1.sayHello(); // "Hello, I'm Alice"
+person2.sayHello(); // "Hello, I'm Bob"
+
+console.log(person1 instanceof Person); // true
+```
+
+**new操作符的工作过程**:
+```javascript
+// 手动实现new操作符的过程
+function myNew(constructor, ...args) {
+  // 1. 创建一个新对象，继承构造函数的原型
+  const obj = Object.create(constructor.prototype);
+  
+  // 2. 执行构造函数，this指向新对象
+  const result = constructor.apply(obj, args);
+  
+  // 3. 如果构造函数返回对象，则返回该对象，否则返回新创建的对象
+  return result instanceof Object ? result : obj;
+}
+
+// 使用示例
+const person3 = myNew(Person, 'Charlie', 35);
+person3.sayHello(); // "Hello, I'm Charlie"
+```
+
+**构造函数返回值的影响**:
+```javascript
+function Person1(name) {
+  this.name = name;
+  // 隐式返回this
+}
+
+function Person2(name) {
+  this.name = name;
+  return { name: 'Overridden' }; // 显式返回对象
+}
+
+function Person3(name) {
+  this.name = name;
+  return 'string'; // 返回原始值，被忽略
+}
+
+const p1 = new Person1('Alice'); // { name: 'Alice' }
+const p2 = new Person2('Bob');   // { name: 'Overridden' }
+const p3 = new Person3('Charlie'); // { name: 'Charlie' }
+```
+
+### 🎯 绑定优先级
+
+当多个绑定规则同时适用时，优先级如下：
+
+**1. new绑定 > 显式绑定 > 隐式绑定 > 默认绑定**
+
+```javascript
+function sayName() {
+  console.log(this.name);
+}
+
+const obj1 = { name: 'obj1', sayName: sayName };
+const obj2 = { name: 'obj2' };
+
+// 隐式绑定 vs 显式绑定
+obj1.sayName(); // "obj1" (隐式绑定)
+obj1.sayName.call(obj2); // "obj2" (显式绑定优先)
+
+// 显式绑定 vs new绑定
+function Person(name) {
+  this.name = name;
+}
+
+const boundPerson = Person.bind(obj1);
+boundPerson('bound'); // obj1.name变为'bound'
+const newPerson = new boundPerson('new'); // 创建新对象，name为'new'
+console.log(newPerson.name); // "new" (new绑定优先)
+```
+
+### 🏹 箭头函数的词法作用域
+
+**核心特点**: 箭头函数没有自己的`this`，它会捕获其所在上下文的`this`值，作为自己的`this`值。
+
+#### 基本行为
+```javascript
+// 普通函数 vs 箭头函数
+const obj = {
+  name: 'Object',
+  
+  regularFunction: function() {
+    console.log('Regular:', this.name); // this指向obj
+    
+    const arrowFunction = () => {
+      console.log('Arrow:', this.name); // 继承外层的this，也指向obj
+    };
+    
+    function innerFunction() {
+      console.log('Inner:', this.name); // this指向全局对象(非严格模式)或undefined(严格模式)
+    }
+    
+    arrowFunction();
+    innerFunction();
+  }
+};
+
+obj.regularFunction();
+// 输出:
+// Regular: Object
+// Arrow: Object
+// Inner: undefined (严格模式)
+```
+
+#### 箭头函数不能被重新绑定
+```javascript
+const obj1 = { name: 'obj1' };
+const obj2 = { name: 'obj2' };
+
+const arrowFunc = () => {
+  console.log(this.name);
+};
+
+// 箭头函数的this不能被改变
+arrowFunc.call(obj1); // undefined (this仍然是定义时的上下文)
+arrowFunc.apply(obj2); // undefined
+arrowFunc.bind(obj1)(); // undefined
+
+// 对比普通函数
+function regularFunc() {
+  console.log(this.name);
+}
+
+regularFunc.call(obj1); // "obj1"
+regularFunc.apply(obj2); // "obj2"
+```
+
+#### 实际应用场景
+
+**1. 事件处理器**
+```javascript
+class Button {
+  constructor(element) {
+    this.element = element;
+    this.clickCount = 0;
+    
+    // 使用箭头函数，this自动绑定到Button实例
+    this.element.addEventListener('click', () => {
+      this.clickCount++;
+      console.log(`按钮被点击了 ${this.clickCount} 次`);
+    });
+    
+    // 如果使用普通函数，需要手动绑定
+    // this.element.addEventListener('click', this.handleClick.bind(this));
+  }
+  
+  handleClick() {
+    this.clickCount++;
+    console.log(`按钮被点击了 ${this.clickCount} 次`);
+  }
+}
+```
+
+**2. 数组方法中的回调**
+```javascript
+class NumberProcessor {
+  constructor(numbers) {
+    this.numbers = numbers;
+    this.multiplier = 2;
+  }
+  
+  // 使用箭头函数
+  processWithArrow() {
+    return this.numbers.map(num => num * this.multiplier);
+  }
+  
+  // 使用普通函数需要额外处理this
+  processWithRegular() {
+    const self = this; // 保存this引用
+    return this.numbers.map(function(num) {
+      return num * self.multiplier;
+    });
+    
+    // 或者使用bind
+    // return this.numbers.map(function(num) {
+    //   return num * this.multiplier;
+    // }.bind(this));
+  }
+}
+
+const processor = new NumberProcessor([1, 2, 3, 4]);
+console.log(processor.processWithArrow()); // [2, 4, 6, 8]
+```
+
+**3. 定时器**
+```javascript
+class Timer {
+  constructor() {
+    this.seconds = 0;
+  }
+  
+  start() {
+    // 箭头函数确保this指向Timer实例
+    setInterval(() => {
+      this.seconds++;
+      console.log(`已过去 ${this.seconds} 秒`);
+    }, 1000);
+    
+    // 普通函数需要绑定this
+    // setInterval(function() {
+    //   this.seconds++;
+    //   console.log(`已过去 ${this.seconds} 秒`);
+    // }.bind(this), 1000);
+  }
+}
+```
+
+#### 箭头函数的限制
+```javascript
+// 1. 不能用作构造函数
+const ArrowFunc = () => {
+  this.name = 'test';
+};
+// const instance = new ArrowFunc(); // TypeError: ArrowFunc is not a constructor
+
+// 2. 没有arguments对象
+const arrowFunc = () => {
+  console.log(arguments); // ReferenceError: arguments is not defined
+};
+
+// 使用剩余参数代替
+const arrowFuncWithRest = (...args) => {
+  console.log(args); // 正确
+};
+
+// 3. 没有prototype属性
+console.log(ArrowFunc.prototype); // undefined
+
+// 4. 不能用作生成器函数
+// const arrowGenerator = * () => { // SyntaxError
+//   yield 1;
+// };
+```
+
+### 🛠️ 实际应用案例
+
+#### 案例1: React组件中的事件处理
+```javascript
+class MyComponent extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { count: 0 };
+  }
+  
+  // 箭头函数方法 - 自动绑定this
+  handleClickArrow = () => {
+    this.setState({ count: this.state.count + 1 });
+  }
+  
+  // 普通方法 - 需要在构造函数中绑定或使用bind
+  handleClickRegular() {
+    this.setState({ count: this.state.count + 1 });
+  }
+  
+  render() {
+    return (
+      <div>
+        <p>Count: {this.state.count}</p>
+        <button onClick={this.handleClickArrow}>箭头函数</button>
+        <button onClick={this.handleClickRegular.bind(this)}>普通函数</button>
+      </div>
+    );
+  }
+}
+```
+
+#### 案例2: API调用中的this处理
+```javascript
+class ApiService {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+    this.token = null;
+  }
+  
+  async fetchData(endpoint) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        headers: this.getHeaders()
+      });
+      
+      return response.json();
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+  
+  getHeaders() {
+    return {
+      'Authorization': `Bearer ${this.token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+  
+  handleError(error) {
+    console.error('API Error:', error);
+  }
+  
+  // 使用箭头函数确保this绑定正确
+  setupErrorHandler() {
+    window.addEventListener('unhandledrejection', (event) => {
+      this.handleError(event.reason); // this正确指向ApiService实例
+    });
+  }
+}
+```
+
+### 📝 总结
+
+#### this绑定规则优先级：
+1. **new绑定** - 构造函数调用
+2. **显式绑定** - call/apply/bind
+3. **隐式绑定** - 对象方法调用
+4. **默认绑定** - 独立函数调用
+
+#### 箭头函数特点：
+- 没有自己的this，使用词法作用域
+- 不能被call/apply/bind改变this
+- 不能用作构造函数
+- 适合回调函数和事件处理器
+
+#### 最佳实践：
+- 理解调用位置决定this的值
+- 在需要保持this上下文的回调中使用箭头函数
+- 在构造函数和对象方法中使用普通函数
+- 必要时使用bind创建硬绑定函数
 
 ---
 
