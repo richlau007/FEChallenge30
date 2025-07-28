@@ -78,10 +78,17 @@ FEChallenge30/
 
 ## 学习资源
 
+### 📚 核心文档
 - [MDN Web文档](https://developer.mozilla.org/)
 - [现代JavaScript教程](https://zh.javascript.info/)
 - [CSS技巧大全](https://css-tricks.com/)
 - [前端工程化实践](https://webpack.js.org/)
+
+### 🎯 面试准备
+- [JavaScript面试题大全](docs/javascript-interview-questions.md) - 10道热门面试题详解
+
+### 💻 实践项目
+- [Day 01: JavaScript基础](challenges/day01/) - 变量、作用域与闭包
 
 ## 社区支持
 
